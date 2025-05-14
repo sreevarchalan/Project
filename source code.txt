@@ -1,0 +1,130 @@
+from google.colab import files
+ uploaded = files.upload()
+
+ import pandas as pd
+
+df = pd.read_csv("Credit_Card_Applications.csv")
+print(df.head())
+
+print(df.info())
+print(df.describe())
+print(df['Class'].value_counts())
+print(df.isnull().sum())
+print(df.duplicated().sum())
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Histogram of a likely numeric feature (e.g., A14)
+sns.histplot(df['A14'], bins=50)
+plt.title('Distribution of A14')
+plt.xlabel('A14')
+plt.ylabel('Frequency')
+plt.show()
+
+# Heatmap of the correlation among the last 5 features
+plt.figure(figsize=(10, 8))
+sns.heatmap(df.iloc[:, -6:-1].corr(), annot=True, cmap='coolwarm')
+plt.title('Correlation Heatmap (Last 5 Features)')
+plt.show()
+
+X = df.drop('Class', axis=1)
+y = df['Class']
+X = pd.get_dummies(X, drop_first=True)
+
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, stratify=y, random_state=42)
+
+from sklearn.ensemble import RandomForestClassifier
+
+model = RandomForestClassifier(random_state=42)
+model.fit(X_train, y_train)
+
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+
+y_pred = model.predict(X_test)
+
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Classification Report:\n", classification_report(y_test, y_pred))
+print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+
+
+import numpy as np
+
+# Simulated input with 15 feature values, matching the original data's features
+# ***You need to ensure that the input values and their order match the features used during training.***
+# ***For example, if 'A1, A2, ... A15' were your original features, then ensure the new_input values correspond to them.***
+
+# Example with placeholder values - replace with actual input values:
+new_input = np.array([[0, 22.5, 10.0, 2, 4, 4, 1.5, 0, 0, 0, 1, 2, 100, 1200, 1]]) # Added a placeholder value for the 15th feature
+
+# Scale the input
+new_input_scaled = scaler.transform(new_input)
+
+# Make prediction
+prediction = model.predict(new_input_scaled)
+print("Predicted class:", prediction[0])
+
+input_df = pd.DataFrame(new_input, columns=df.drop('Class', axis=1).columns)
+
+
+if prediction[0] == 1:
+    print("Fraudulent transaction")
+else:
+    print("Legitimate transaction")
+
+!pip install -q gradio scikit-learn pandas joblib
+
+from google.colab import files
+uploaded = files.upload()
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+import joblib
+
+# Load dataset
+df = pd.read_csv("Credit_Card_Applications.csv")
+
+# Separate features and target
+X = df.drop(columns=["Class"])  # Removed "Time" which doesn't exist
+y = df["Class"]
+
+# Scale features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Split into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+# Train logistic regression model
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train, y_train)
+
+# Save model, scaler, and feature names
+joblib.dump(model, "fraud_model.pkl")
+joblib.dump(scaler, "scaler.pkl")
+joblib.dump(X.columns.tolist(), "feature_names.pkl")
+
+import gradio as gr
+
+model = joblib.load("fraud_model.pkl")
+scaler = joblib.load("scaler.pkl")
+feature_names = joblib.load("feature_names.pkl")
+
+def predict_fraud(*inputs):
+    input_array = np.array(inputs).reshape(1, -1)
+    input_scaled = scaler.transform(input_array)
+    prediction = model.predict(input_scaled)[0]
+    return "Fraud" if prediction == 1 else "Not Fraud"
+
+inputs = [gr.Number(label=col) for col in feature_names]
+interface = gr.Interface(fn=predict_fraud, inputs=inputs, outputs="text", title="Credit Card Fraud Detection")
+
+interface.launch(share=True)
